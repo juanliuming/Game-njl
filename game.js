@@ -1,0 +1,1658 @@
+// 游戏主类
+class Game {
+    constructor() {
+        // 游戏画布和上下文
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        
+        // 游戏状态
+        this.gameState = 'intro'; // intro, playing, paused, gameOver
+        this.level = 1;
+        this.crystals = 0;
+        
+        // 输入控制
+        this.keys = {
+            left: false,
+            right: false,
+            up: false,
+            x: false,
+            space: false
+        };
+        
+        // 游戏对象
+        this.player = null;
+        this.enemies = [];
+        this.platforms = [];
+        this.projectiles = [];
+        this.crystalsArray = [];
+        this.backgroundElements = [];
+        this.spikes = [];
+        
+        // 物理参数
+        this.gravity = 0.5;
+        this.friction = 0.8;
+        this.canvasWidth = this.canvas.width;
+        this.canvasHeight = this.canvas.height;
+        
+        // UI元素
+        this.healthFill = document.getElementById('healthFill');
+        this.healthText = document.getElementById('healthText');
+        this.manaFill = document.getElementById('manaFill');
+        this.manaText = document.getElementById('manaText');
+        this.crystalsCount = document.getElementById('crystalsCount');
+        this.levelNumber = document.getElementById('levelNumber');
+        this.gameOverScreen = document.getElementById('gameOverScreen');
+        this.pauseScreen = document.getElementById('pauseScreen');
+        this.introScreen = document.getElementById('introScreen');
+        
+        // 游戏目标提示
+        this.gameGoal = {
+            totalCrystals: 0, 
+            collectedCrystals: 0,
+            totalEnemies: 0,
+            remainingEnemies: 0,
+            reachedEnd: false
+        };
+        
+        // 初始化游戏
+        this.init();
+        
+        // 绑定事件
+        this.bindEvents();
+        
+        // 开始游戏循环
+        this.gameLoop();
+    }
+    
+    // 初始化游戏
+    init() {
+        // 创建玩家
+        this.player = new Player(this.canvasWidth / 4, this.canvasHeight - 100);
+        
+        // 创建第一关
+        this.createLevel1();
+        
+        // 更新UI
+        this.updateUI();
+    }
+    
+    // 创建第一关
+    createLevel1() {
+        // 清空现有对象
+        this.enemies = [];
+        this.platforms = [];
+        this.projectiles = [];
+        this.crystalsArray = [];
+        this.backgroundElements = [];
+        
+        // 清空背景元素（移除所有树木）
+        this.backgroundElements = [];
+        
+        // 创建平台（增加高度差和复杂性）
+        this.platforms.push(new Platform(0, this.canvasHeight - 30, this.canvasWidth, 30));
+        this.platforms.push(new Platform(100, this.canvasHeight - 100, 120, 20));
+        this.platforms.push(new Platform(250, this.canvasHeight - 180, 100, 20));
+        this.platforms.push(new Platform(400, this.canvasHeight - 140, 80, 20));
+        this.platforms.push(new Platform(520, this.canvasHeight - 220, 120, 20));
+        this.platforms.push(new Platform(700, this.canvasHeight - 160, 100, 20));
+        
+        // 创建敌人 - 保持原数量（1个）
+        // 移动型敌人（在地面巡逻）
+        this.enemies.push(new Enemy(200, this.canvasHeight - 60, 1, 'mobile')); // 玩家右侧不远处
+        
+        // 创建魔法水晶
+        const crystals = [
+            new Crystal(140, this.canvasHeight - 120),
+            new Crystal(290, this.canvasHeight - 200),
+            new Crystal(440, this.canvasHeight - 160)
+        ];
+        this.crystalsArray.push(...crystals);
+        
+        // 设置游戏目标
+        this.gameGoal.totalCrystals = this.crystalsArray.length;
+        this.gameGoal.collectedCrystals = 0;
+        this.gameGoal.totalEnemies = 1; // 保持原数量
+        this.gameGoal.remainingEnemies = 1;
+        this.gameGoal.reachedEnd = false;
+        
+        // 创建终点门
+        this.endDoor = {
+            x: this.canvasWidth - 80,
+            y: this.canvasHeight - 100,
+            width: 60,
+            height: 100,
+            color: '#8B4513'
+        };
+        this.gameGoal.reachedEnd = false;
+        
+        // 创建终点门
+        this.endDoor = {
+            x: this.canvasWidth - 80,
+            y: this.canvasHeight - 100,
+            width: 60,
+            height: 100,
+            color: '#8B4513'
+        };
+    }
+    
+    // 绑定事件
+    bindEvents() {
+        // 键盘事件
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowLeft': this.keys.left = true; break;
+                case 'ArrowRight': this.keys.right = true; break;
+                case 'ArrowUp': this.keys.up = true; break;
+
+                case 'x': this.keys.x = true; break;
+                case 'c': this.keys.c = true; break;
+                case 'v': this.keys.v = true; break;
+                case ' ': 
+                    e.preventDefault();
+                    this.keys.space = true; 
+                    break;
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            switch(e.key) {
+                case 'ArrowLeft': this.keys.left = false; break;
+                case 'ArrowRight': this.keys.right = false; break;
+                case 'ArrowUp': this.keys.up = false; break;
+
+                case 'x': this.keys.x = false; break;
+                case 'c': this.keys.c = false; break;
+                case 'v': this.keys.v = false; break;
+                case ' ': 
+                    e.preventDefault();
+                    this.keys.space = false; 
+                    break;
+            }
+        });
+        
+        // 按钮事件
+        document.getElementById('startBtn').addEventListener('click', () => this.startGame());
+        document.getElementById('restartBtn').addEventListener('click', () => this.restart());
+        document.getElementById('resumeBtn').addEventListener('click', () => this.resume());
+        document.getElementById('restartGameBtn').addEventListener('click', () => this.restart());
+    }
+    
+    // 开始游戏
+    startGame() {
+        this.introScreen.style.display = 'none';
+        this.gameState = 'playing';
+    }
+    
+    // 游戏循环
+    gameLoop() {
+        if (this.gameState === 'playing') {
+            this.update();
+            this.render();
+        }
+        requestAnimationFrame(() => this.gameLoop());
+    }
+    
+    // 更新游戏状态
+    update() {
+        // 更新玩家
+        this.player.update(this.keys, this.platforms, this);
+        
+        // 更新敌人
+        for (let enemy of this.enemies) {
+            enemy.update(this.platforms, this.player, this);
+        }
+        
+        // 更新投射物
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            let projectile = this.projectiles[i];
+            projectile.update();
+            
+            // 检查投射物是否超出屏幕
+            if (projectile.x < 0 || projectile.x > this.canvasWidth || 
+                projectile.y < 0 || projectile.y > this.canvasHeight) {
+                this.projectiles.splice(i, 1);
+                continue;
+            }
+            
+            // 检查投射物是否击中敌人
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+                let enemy = this.enemies[j];
+                if (this.checkCollision(projectile, enemy)) {
+                    enemy.takeDamage(projectile.damage);
+                    this.projectiles.splice(i, 1);
+                    
+                    // 如果敌人死亡
+                    if (enemy.health <= 0) {
+                        this.enemies.splice(j, 1);
+                        this.gameGoal.remainingEnemies--;
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // 更新平台（处理冰块碎裂）
+        for (let platform of this.platforms) {
+            platform.update(this.player);
+        }
+        
+        // 检查水晶收集
+        for (let i = this.crystalsArray.length - 1; i >= 0; i--) {
+            let crystal = this.crystalsArray[i];
+            if (this.checkCollision(this.player, crystal)) {
+                this.crystals++;
+                this.gameGoal.collectedCrystals++;
+                this.crystalsArray.splice(i, 1);
+                this.updateUI();
+            }
+        }
+        
+        // 检查玩家与敌人碰撞（受伤逻辑）
+        for (let enemy of this.enemies) {
+            if (this.checkCollision(this.player, enemy)) {
+                // 玩家受到伤害
+                this.player.health -= enemy.attackDamage;
+                if (this.player.health < 0) this.player.health = 0;
+                this.updateUI();
+                
+                // 玩家被击退
+                this.player.velocityX = this.player.x < enemy.x ? -10 : 10;
+                this.player.velocityY = -8;
+                
+                // 防止连续受伤
+                break;
+            }
+        }
+        
+        // 检查玩家与地刺碰撞
+        for (let spike of this.spikes) {
+            if (this.checkCollision(this.player, spike)) {
+                // 玩家受到伤害
+                this.player.health -= spike.damage;
+                if (this.player.health < 0) this.player.health = 0;
+                this.updateUI();
+                
+                // 玩家被击退
+                this.player.velocityX = this.player.x < spike.x ? -10 : 10;
+                this.player.velocityY = -8;
+                
+                // 防止连续受伤
+                break;
+            }
+        }
+        
+        // 检查玩家是否死亡
+        if (this.player.health <= 0) {
+            this.gameOver();
+        }
+        
+        // 检查关卡是否完成
+        if (this.gameGoal.collectedCrystals === this.gameGoal.totalCrystals && 
+            this.gameGoal.remainingEnemies === 0) {
+            // 玩家在门内时进入下一关
+            if (this.endDoor && this.checkCollision(this.player, this.endDoor)) {
+                this.nextLevel();
+            }
+        }
+    }
+    
+    // 渲染游戏
+    render() {
+        // 根据关卡设置不同背景
+        switch(this.level) {
+            case 1: // 森林入口
+                this.ctx.fillStyle = '#008000'; // 绿色地面
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                // 绘制天空
+                this.ctx.fillStyle = '#87CEEB';
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight - 100);
+                // 绘制树木轮廓
+                this.ctx.fillStyle = '#228B22';
+                for (let tree of this.backgroundElements) {
+                    this.ctx.fillRect(tree.x, tree.y, tree.width, tree.height);
+                }
+                break;
+            case 2: // 幽暗洞穴
+                this.ctx.fillStyle = '#2c1810'; // 棕色洞穴壁
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                // 绘制洞穴顶部
+                this.ctx.fillStyle = '#1a0f0a';
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight / 2);
+                // 绘制岩石
+                this.ctx.fillStyle = '#3d281e';
+                for (let rock of this.backgroundElements) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(rock.x, rock.y, rock.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                break;
+            case 3: // 魔法湖泊
+                this.ctx.fillStyle = '#1e3a8a'; // 蓝色水面
+                this.ctx.fillRect(0, this.canvasHeight - 50, this.canvasWidth, 50);
+                // 绘制天空
+                this.ctx.fillStyle = '#4682B4';
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight - 50);
+                // 绘制波浪
+                this.ctx.strokeStyle = '#5a9bd4';
+                this.ctx.lineWidth = 2;
+                for (let wave of this.backgroundElements) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, wave.y);
+                    for (let x = 0; x < this.canvasWidth; x += 20) {
+                        const y = wave.y + Math.sin(x / 20) * 3;
+                        this.ctx.lineTo(x, y);
+                    }
+                    this.ctx.stroke();
+                }
+                break;
+            case 4: // 古代遗迹
+                this.ctx.fillStyle = '#4b5563'; // 灰色地面
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                // 绘制天空
+                this.ctx.fillStyle = '#6b7280';
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight - 100);
+                // 绘制石柱
+                this.ctx.fillStyle = '#8b92a0';
+                for (let pillar of this.backgroundElements) {
+                    this.ctx.fillRect(pillar.x, pillar.y, pillar.width, pillar.height);
+                }
+                break;
+            case 5: // 黑暗城堡
+                this.ctx.fillStyle = '#111827'; // 深灰地面
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                // 绘制天空
+                this.ctx.fillStyle = '#1f2937';
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight - 100);
+                // 绘制城堡剪影
+                this.ctx.fillStyle = '#374151';
+                for (let tower of this.backgroundElements) {
+                    // 绘制塔身
+                    this.ctx.fillRect(tower.x, tower.y, tower.width, tower.height);
+                    // 绘制塔尖
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(tower.x, tower.y);
+                    this.ctx.lineTo(tower.x + tower.width/2, tower.y - 30);
+                    this.ctx.lineTo(tower.x + tower.width, tower.y);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                }
+                break;
+            default: // 默认背景
+                this.ctx.fillStyle = '#008000';
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                this.ctx.fillStyle = '#87CEEB';
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight - 100);
+        }
+        
+        // 绘制平台
+        for (let platform of this.platforms) {
+            platform.render(this.ctx);
+        }
+        
+        // 绘制地刺
+        for (let spike of this.spikes) {
+            spike.render(this.ctx);
+        }
+        
+        // 绘制敌人
+        for (let enemy of this.enemies) {
+            enemy.render(this.ctx);
+        }
+        
+        // 绘制水晶
+        for (let crystal of this.crystalsArray) {
+            crystal.render(this.ctx);
+        }
+        
+        // 绘制投射物
+        for (let projectile of this.projectiles) {
+            projectile.render(this.ctx);
+        }
+        
+        // 绘制玩家
+        this.player.render(this.ctx);
+        
+        // 获取关卡名称
+        const levelNames = {
+            1: '森林入口',
+            2: '幽暗洞穴',
+            3: '魔法湖泊',
+            4: '古代遗迹',
+            5: '黑暗城堡'
+        };
+        const currentLevelName = levelNames[this.level] || `关卡 ${this.level}`;
+        
+        // 统一UI元素宽度
+        const uiWidth = 350;
+        const baseX = 10;
+        
+        // 绘制关卡名称
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(baseX, 10, uiWidth, 30);
+        this.ctx.fillStyle = '#ffd700';
+        this.ctx.font = 'bold 18px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`关卡 ${this.level}：${currentLevelName}`, baseX + uiWidth / 2, 32);
+        
+        // 绘制游戏目标提示
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(baseX, 50, uiWidth, 35);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '14px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`收集 ${this.gameGoal.totalCrystals} 个魔法水晶 (${this.gameGoal.collectedCrystals}/${this.gameGoal.totalCrystals})`, baseX + uiWidth / 2, 72);
+        
+        // 绘制操作提示
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(baseX, 95, uiWidth, 30);
+        this.ctx.fillStyle = '#ffd700';
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('操作提示:', baseX + 20, 113);
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillText('X-火球术  C-冰锥术', baseX + 110, 113);
+        
+        // 绘制敌人剩余数量
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(baseX, 135, uiWidth, 30);
+        this.ctx.fillStyle = '#ff6600';
+        this.ctx.font = '14px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`敌人剩余：${this.gameGoal.remainingEnemies}/${this.gameGoal.totalEnemies}`, baseX + uiWidth / 2, 155);
+        
+        // 绘制终点门
+        if (this.endDoor) {
+            // 绘制门框
+            this.ctx.fillStyle = '#8B4513';
+            this.ctx.fillRect(this.endDoor.x - 10, this.endDoor.y - 10, this.endDoor.width + 20, this.endDoor.height + 20);
+            
+            // 绘制门
+            this.ctx.fillStyle = '#654321';
+            this.ctx.fillRect(this.endDoor.x, this.endDoor.y, this.endDoor.width, this.endDoor.height);
+            
+            // 绘制门的纹理
+            this.ctx.strokeStyle = '#4a3728';
+            this.ctx.lineWidth = 2;
+            
+            // 竖线
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.endDoor.x + this.endDoor.width / 2, this.endDoor.y);
+            this.ctx.lineTo(this.endDoor.x + this.endDoor.width / 2, this.endDoor.y + this.endDoor.height);
+            this.ctx.stroke();
+            
+            // 横线
+            for (let i = 1; i < 5; i++) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.endDoor.x, this.endDoor.y + (this.endDoor.height / 5) * i);
+                this.ctx.lineTo(this.endDoor.x + this.endDoor.width, this.endDoor.y + (this.endDoor.height / 5) * i);
+                this.ctx.stroke();
+            }
+            
+            // 绘制门把手
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.beginPath();
+            this.ctx.arc(this.endDoor.x + this.endDoor.width - 15, this.endDoor.y + this.endDoor.height / 2, 6, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // 绘制门内光芒（完成所有目标后显示）
+            if (this.gameGoal.collectedCrystals === this.gameGoal.totalCrystals && 
+                this.gameGoal.remainingEnemies === 0) {
+                // 动态光芒效果
+                const time = Date.now() / 500;
+                const alpha = 0.2 + 0.1 * Math.sin(time);
+                this.ctx.fillStyle = `rgba(255, 255, 0, ${alpha})`;
+                this.ctx.fillRect(this.endDoor.x, this.endDoor.y, this.endDoor.width, this.endDoor.height);
+                
+                // 绘制门内星光效果
+                for (let i = 0; i < 5; i++) {
+                    const starX = this.endDoor.x + 10 + Math.random() * (this.endDoor.width - 20);
+                    const starY = this.endDoor.y + 10 + Math.random() * (this.endDoor.height - 20);
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.random() * 0.5})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(starX, starY, Math.random() * 2 + 1, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                // 绘制提示文字
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = 'bold 14px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('进入下一关', this.endDoor.x + this.endDoor.width / 2, this.endDoor.y + this.endDoor.height + 25);
+            }
+        }
+        
+        // 绘制技能冷却提示
+        const skills = [
+            { name: '火球术 (X)', cooldown: this.player.skillCooldowns.x, maxCooldown: 30, color: '#ff6600' },
+            { name: '冰锥术 (C)', cooldown: this.player.skillCooldowns.c, maxCooldown: 45, color: '#87CEFA' }
+        ];
+        
+        const width = 140;
+        const height = 30;
+        const spacing = 5;
+        
+        for (let i = 0; i < skills.length; i++) {
+            const skill = skills[i];
+            const x = this.canvasWidth - width;
+            const y = 10 + i * (height + spacing);
+            
+            // 技能背景
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            this.ctx.fillRect(x, y, width, height);
+            
+            // 技能名称
+            this.ctx.fillStyle = skill.color;
+            this.ctx.font = '14px Arial';
+            this.ctx.textAlign = 'left';
+            this.ctx.fillText(skill.name, x + 10, y + 20);
+            
+            // 冷却条
+            if (skill.cooldown > 0) {
+                const cooldownPercent = (skill.cooldown / skill.maxCooldown) * 100;
+                this.ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                this.ctx.fillRect(x, y, (cooldownPercent / 100) * width, height);
+                
+                // 冷却时间
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = '14px Arial';
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(Math.ceil(skill.cooldown / 10), x + width - 10, y + 20);
+            }
+        }
+    }
+    
+    // 碰撞检测（支持矩形和圆形）
+    checkCollision(obj1, obj2) {
+        // 如果是碎掉的冰块，不进行碰撞检测
+        if (obj2.type === 'ice' && obj2.isBroken) {
+            return false;
+        }
+        
+        // 检查是否是圆形（投射物）
+        if (obj1.size !== undefined) {
+            // 圆形与矩形碰撞检测
+            const closestX = Math.max(obj2.x, Math.min(obj1.x, obj2.x + obj2.width));
+            const closestY = Math.max(obj2.y, Math.min(obj1.y, obj2.y + obj2.height));
+            
+            const distanceX = obj1.x - closestX;
+            const distanceY = obj1.y - closestY;
+            const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+            
+            return distanceSquared < (obj1.size * obj1.size);
+        } else {
+            // 矩形与矩形碰撞检测
+            return obj1.x < obj2.x + obj2.width &&
+                   obj1.x + obj1.width > obj2.x &&
+                   obj1.y < obj2.y + obj2.height &&
+                   obj1.y + obj1.height > obj2.y;
+        }
+    }
+    
+    // 更新UI
+    updateUI() {
+        // 更新生命值
+        const healthPercent = (this.player.health / this.player.maxHealth) * 100;
+        this.healthFill.style.width = `${healthPercent}%`;
+        this.healthText.textContent = `${this.player.health}/${this.player.maxHealth}`;
+        
+        // 更新魔法值（保留整数）
+        const currentMana = Math.floor(this.player.mana);
+        const maxMana = Math.floor(this.player.maxMana);
+        const manaPercent = (currentMana / maxMana) * 100;
+        this.manaFill.style.width = `${manaPercent}%`;
+        this.manaText.textContent = `${currentMana}/${maxMana}`;
+        
+        // 更新水晶数量
+        this.crystalsCount.textContent = this.crystals;
+        
+        // 更新关卡
+        this.levelNumber.textContent = this.level;
+    }
+    
+    // 暂停游戏
+    pause() {
+        this.gameState = 'paused';
+        this.pauseScreen.style.display = 'flex';
+    }
+    
+    // 继续游戏
+    resume() {
+        this.gameState = 'playing';
+        this.pauseScreen.style.display = 'none';
+    }
+    
+    // 游戏结束
+    gameOver() {
+        this.gameState = 'gameOver';
+        document.getElementById('gameOverMessage').textContent = `你收集了 ${this.crystals} 个魔法水晶！`;
+        this.gameOverScreen.style.display = 'flex';
+    }
+    
+    // 重新开始游戏
+    restart() {
+        this.gameState = 'playing';
+        this.level = 1;
+        this.crystals = 0;
+        this.gameOverScreen.style.display = 'none';
+        this.pauseScreen.style.display = 'none';
+        this.init();
+    }
+    
+    // 下一关
+    nextLevel() {
+        this.level++;
+        this.player.health = this.player.maxHealth;
+        this.player.mana = this.player.maxMana;
+        
+        // 根据关卡创建不同的地图
+        switch(this.level) {
+            case 2:
+                this.createLevel2();
+                break;
+            case 3:
+                this.createLevel3();
+                break;
+            case 4:
+                this.createLevel4();
+                break;
+            case 5:
+                this.createLevel5();
+                break;
+            default:
+                // 游戏胜利
+                document.getElementById('gameOverTitle').textContent = '游戏胜利！';
+                document.getElementById('gameOverMessage').textContent = `你成功通关了所有关卡！共收集了 ${this.crystals} 个魔法水晶！`;
+                this.gameOverScreen.style.display = 'flex';
+                this.gameState = 'gameOver';
+                return;
+        }
+        
+        this.updateUI();
+    }
+    
+    // 创建第二关（简单示例）
+    createLevel2() {
+        // 清空现有对象
+        this.enemies = [];
+        this.platforms = [];
+        this.projectiles = [];
+        this.crystalsArray = [];
+        this.backgroundElements = [];
+        
+        // 生成洞穴岩石元素
+        for (let i = 0; i < 15; i++) {
+            this.backgroundElements.push({
+                x: Math.random() * this.canvasWidth,
+                y: Math.random() * (this.canvasHeight - 100),
+                size: 5 + Math.random() * 15
+            });
+        }
+        
+        // 创建更复杂的平台布局
+        this.platforms.push(new Platform(0, this.canvasHeight - 30, this.canvasWidth, 30));
+        this.platforms.push(new Platform(50, this.canvasHeight - 120, 80, 20));
+        this.platforms.push(new Platform(180, this.canvasHeight - 200, 100, 20));
+        this.platforms.push(new Platform(330, this.canvasHeight - 150, 80, 20));
+        this.platforms.push(new Platform(450, this.canvasHeight - 250, 100, 20));
+        this.platforms.push(new Platform(600, this.canvasHeight - 180, 80, 20));
+        this.platforms.push(new Platform(700, this.canvasHeight - 280, 100, 20));
+        
+        // 添加冰块跳板（更明显的位置）
+        this.platforms.push(new Platform(250, this.canvasHeight - 130, 90, 25, 'ice')); // 中间高处平台旁边
+        this.platforms.push(new Platform(650, this.canvasHeight - 110, 80, 25, 'ice')); // 右侧平台上方
+        
+        // 创建敌人（调整为1移动1静止，静止敌人在跳板上）
+        this.enemies.push(new Enemy(150, this.canvasHeight - 60, 2, 'mobile')); // 移动型敌人
+        this.enemies.push(new Enemy(450, this.canvasHeight - 270, 2, 'static')); // 静止型敌人（在450,250的平台上，调整位置使其更明显）
+        
+        // 创建魔法水晶
+        this.crystalsArray.push(new Crystal(90, this.canvasHeight - 140));
+        this.crystalsArray.push(new Crystal(220, this.canvasHeight - 220));
+        this.crystalsArray.push(new Crystal(370, this.canvasHeight - 170));
+        this.crystalsArray.push(new Crystal(500, this.canvasHeight - 270));
+        this.crystalsArray.push(new Crystal(640, this.canvasHeight - 200));
+        this.crystalsArray.push(new Crystal(750, this.canvasHeight - 300));
+        
+        // 设置游戏目标
+        this.gameGoal.totalCrystals = this.crystalsArray.length;
+        this.gameGoal.collectedCrystals = 0;
+        this.gameGoal.totalEnemies = this.enemies.length;
+        this.gameGoal.remainingEnemies = this.enemies.length;
+        this.gameGoal.reachedEnd = false;
+        
+        // 创建终点门
+        this.endDoor = {
+            x: this.canvasWidth - 80,
+            y: this.canvasHeight - 100,
+            width: 60,
+            height: 100,
+            color: '#8B4513'
+        };
+    }
+    
+    // 创建第三关（幽暗洞穴）
+    createLevel3() {
+        // 清空现有对象
+        this.enemies = [];
+        this.platforms = [];
+        this.projectiles = [];
+        this.crystalsArray = [];
+        this.backgroundElements = [];
+        this.spikes = [];
+        
+        // 生成湖泊波浪元素
+        for (let i = 0; i < 5; i++) {
+            this.backgroundElements.push({
+                y: this.canvasHeight - 50 + i * 10
+            });
+        }
+        
+        // 创建洞穴风格的平台布局
+        this.platforms.push(new Platform(0, this.canvasHeight - 30, this.canvasWidth, 30));
+        this.platforms.push(new Platform(30, this.canvasHeight - 100, 100, 20));
+        this.platforms.push(new Platform(180, this.canvasHeight - 180, 120, 20));
+        this.platforms.push(new Platform(350, this.canvasHeight - 130, 90, 20));
+        this.platforms.push(new Platform(500, this.canvasHeight - 220, 110, 20));
+        this.platforms.push(new Platform(680, this.canvasHeight - 160, 120, 20));
+        this.platforms.push(new Platform(250, this.canvasHeight - 280, 100, 20));
+        this.platforms.push(new Platform(550, this.canvasHeight - 320, 100, 20));
+        
+        // 添加地刺（在平台之间的空隙中）
+        // 第一组地刺（地面）
+        for (let i = 0; i < 3; i++) {
+            this.spikes.push(new Spike(150 + i * 25, this.canvasHeight - 50));
+        }
+        // 第二组地刺（地面）
+        for (let i = 0; i < 4; i++) {
+            this.spikes.push(new Spike(450 + i * 25, this.canvasHeight - 50));
+        }
+        // 第三组地刺（高处平台下方）
+        for (let i = 0; i < 2; i++) {
+            this.spikes.push(new Spike(300 + i * 25, this.canvasHeight - 150));
+        }
+        
+        // 创建敌人（保持原数量）
+        this.enemies.push(new Enemy(100, this.canvasHeight - 60, 3, 'mobile')); // 移动型敌人
+        this.enemies.push(new Enemy(300, this.canvasHeight - 50, 3, 'mobile')); // 移动型敌人
+        this.enemies.push(new Enemy(550, this.canvasHeight - 240, 3, 'static')); // 静止型敌人（在500,220的平台上）
+        
+        // 创建魔法水晶
+        this.crystalsArray.push(new Crystal(80, this.canvasHeight - 120));
+        this.crystalsArray.push(new Crystal(240, this.canvasHeight - 200));
+        this.crystalsArray.push(new Crystal(395, this.canvasHeight - 150));
+        this.crystalsArray.push(new Crystal(555, this.canvasHeight - 240));
+        this.crystalsArray.push(new Crystal(740, this.canvasHeight - 180));
+        this.crystalsArray.push(new Crystal(290, this.canvasHeight - 300));
+        this.crystalsArray.push(new Crystal(595, this.canvasHeight - 340));
+        
+        // 设置游戏目标
+        this.gameGoal.totalCrystals = this.crystalsArray.length;
+        this.gameGoal.collectedCrystals = 0;
+        this.gameGoal.totalEnemies = this.enemies.length;
+        this.gameGoal.remainingEnemies = this.enemies.length;
+        this.gameGoal.reachedEnd = false;
+        
+        // 创建终点门
+        this.endDoor = {
+            x: this.canvasWidth - 80,
+            y: this.canvasHeight - 100,
+            width: 60,
+            height: 100,
+            color: '#8B4513'
+        };
+    }
+    
+    // 创建第四关（魔法湖泊）
+    createLevel4() {
+        // 清空现有对象
+        this.enemies = [];
+        this.platforms = [];
+        this.projectiles = [];
+        this.crystalsArray = [];
+        this.backgroundElements = [];
+        
+        // 生成遗迹石柱元素
+        for (let i = 0; i < 6; i++) {
+            this.backgroundElements.push({
+                x: Math.random() * this.canvasWidth,
+                y: this.canvasHeight - 150,
+                width: 20,
+                height: 150
+            });
+        }
+        
+        // 创建湖泊风格的平台布局（更多空中平台）
+        this.platforms.push(new Platform(0, this.canvasHeight - 30, this.canvasWidth, 30));
+        this.platforms.push(new Platform(50, this.canvasHeight - 150, 90, 20));
+        this.platforms.push(new Platform(200, this.canvasHeight - 250, 110, 20));
+        this.platforms.push(new Platform(380, this.canvasHeight - 180, 100, 20));
+        this.platforms.push(new Platform(550, this.canvasHeight - 280, 120, 20));
+        this.platforms.push(new Platform(700, this.canvasHeight - 200, 100, 20));
+        this.platforms.push(new Platform(100, this.canvasHeight - 320, 80, 20));
+        this.platforms.push(new Platform(450, this.canvasHeight - 350, 90, 20));
+        this.platforms.push(new Platform(650, this.canvasHeight - 320, 80, 20));
+        
+        // 创建敌人（保持原数量）
+        this.enemies.push(new Enemy(150, this.canvasHeight - 60, 4, 'mobile')); // 移动型敌人
+        this.enemies.push(new Enemy(300, this.canvasHeight - 50, 4, 'mobile')); // 移动型敌人
+        this.enemies.push(new Enemy(500, this.canvasHeight - 370, 4, 'static')); // 静止型敌人（在450,350的平台上）
+        this.enemies.push(new Enemy(700, this.canvasHeight - 340, 4, 'static')); // 静止型敌人（在650,320的平台上）
+        
+        // 创建魔法水晶
+        this.crystalsArray.push(new Crystal(90, this.canvasHeight - 170));
+        this.crystalsArray.push(new Crystal(255, this.canvasHeight - 270));
+        this.crystalsArray.push(new Crystal(430, this.canvasHeight - 200));
+        this.crystalsArray.push(new Crystal(610, this.canvasHeight - 300));
+        this.crystalsArray.push(new Crystal(750, this.canvasHeight - 220));
+        this.crystalsArray.push(new Crystal(140, this.canvasHeight - 340));
+        this.crystalsArray.push(new Crystal(495, this.canvasHeight - 370));
+        this.crystalsArray.push(new Crystal(690, this.canvasHeight - 340));
+        
+        // 设置游戏目标
+        this.gameGoal.totalCrystals = this.crystalsArray.length;
+        this.gameGoal.collectedCrystals = 0;
+        this.gameGoal.totalEnemies = this.enemies.length;
+        this.gameGoal.remainingEnemies = this.enemies.length;
+        this.gameGoal.reachedEnd = false;
+        
+        // 创建终点门
+        this.endDoor = {
+            x: this.canvasWidth - 80,
+            y: this.canvasHeight - 100,
+            width: 60,
+            height: 100,
+            color: '#8B4513'
+        };
+    }
+    
+    // 创建第五关（黑暗城堡 - 最终关卡）
+    createLevel5() {
+        // 清空现有对象
+        this.enemies = [];
+        this.platforms = [];
+        this.projectiles = [];
+        this.crystalsArray = [];
+        this.backgroundElements = [];
+        
+        // 生成城堡塔楼元素
+        for (let i = 0; i < 8; i++) {
+            this.backgroundElements.push({
+                x: i * 100,
+                y: this.canvasHeight - 100 - (50 + Math.random() * 100),
+                width: 80,
+                height: 50 + Math.random() * 100
+            });
+        }
+        
+        // 创建城堡风格的复杂平台布局
+        this.platforms.push(new Platform(0, this.canvasHeight - 30, this.canvasWidth, 30));
+        this.platforms.push(new Platform(20, this.canvasHeight - 120, 80, 20));
+        this.platforms.push(new Platform(150, this.canvasHeight - 200, 100, 20));
+        this.platforms.push(new Platform(300, this.canvasHeight - 150, 90, 20));
+        this.platforms.push(new Platform(450, this.canvasHeight - 250, 110, 20));
+        this.platforms.push(new Platform(600, this.canvasHeight - 180, 100, 20));
+        this.platforms.push(new Platform(720, this.canvasHeight - 280, 80, 20));
+        this.platforms.push(new Platform(100, this.canvasHeight - 320, 120, 20));
+        this.platforms.push(new Platform(350, this.canvasHeight - 280, 100, 20));
+        this.platforms.push(new Platform(550, this.canvasHeight - 320, 120, 20));
+        this.platforms.push(new Platform(200, this.canvasHeight - 380, 90, 20));
+        this.platforms.push(new Platform(450, this.canvasHeight - 420, 100, 20));
+        
+        // 创建敌人（保持原数量）
+        this.enemies.push(new Enemy(100, this.canvasHeight - 60, 5, 'mobile')); // 移动型敌人
+        this.enemies.push(new Enemy(250, this.canvasHeight - 50, 5, 'mobile')); // 移动型敌人
+        this.enemies.push(new Enemy(400, this.canvasHeight - 80, 5, 'mobile')); // 移动型敌人
+        this.enemies.push(new Enemy(550, this.canvasHeight - 340, 5, 'static')); // 静止型敌人（在550,320的平台上）
+        this.enemies.push(new Enemy(700, this.canvasHeight - 300, 5, 'static')); // 静止型敌人（在720,280的平台上）
+        
+        // 创建魔法水晶（最终收集挑战）
+        this.crystalsArray.push(new Crystal(60, this.canvasHeight - 140));
+        this.crystalsArray.push(new Crystal(195, this.canvasHeight - 220));
+        this.crystalsArray.push(new Crystal(345, this.canvasHeight - 170));
+        this.crystalsArray.push(new Crystal(505, this.canvasHeight - 270));
+        this.crystalsArray.push(new Crystal(650, this.canvasHeight - 200));
+        this.crystalsArray.push(new Crystal(760, this.canvasHeight - 300));
+        this.crystalsArray.push(new Crystal(160, this.canvasHeight - 340));
+        this.crystalsArray.push(new Crystal(400, this.canvasHeight - 300));
+        this.crystalsArray.push(new Crystal(610, this.canvasHeight - 340));
+        this.crystalsArray.push(new Crystal(245, this.canvasHeight - 400));
+        this.crystalsArray.push(new Crystal(495, this.canvasHeight - 440));
+        
+        // 设置游戏目标
+        this.gameGoal.totalCrystals = this.crystalsArray.length;
+        this.gameGoal.collectedCrystals = 0;
+        this.gameGoal.totalEnemies = this.enemies.length;
+        this.gameGoal.remainingEnemies = this.enemies.length;
+        this.gameGoal.reachedEnd = false;
+        
+        // 创建终点门
+        this.endDoor = {
+            x: this.canvasWidth - 80,
+            y: this.canvasHeight - 100,
+            width: 60,
+            height: 100,
+            color: '#8B4513'
+        };
+    }
+}
+
+// 玩家类
+class Player {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 32;
+        this.height = 48;
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.speed = 5;
+        this.jumpPower = -12;
+        this.isJumping = false;
+        this.jumpCount = 0;
+        this.maxJumpCount = 2; // 二段跳
+        
+        // 角色属性
+        this.maxHealth = 100;
+        this.health = this.maxHealth;
+        this.maxMana = 100;
+        this.mana = this.maxMana;
+        this.attackDamage = 10;
+        
+        // 技能冷却
+        this.skillCooldowns = {
+            x: 0, // 火球术冷却
+            c: 0  // 冰锥术冷却
+        };
+        
+        // 动画
+        this.animationFrame = 0;
+        this.animationSpeed = 0.2;
+        this.facingRight = true;
+    }
+    
+    update(keys, platforms, game) {
+        // 移动
+        if (keys.left) {
+            this.velocityX = -this.speed;
+            this.facingRight = false;
+        } else if (keys.right) {
+            this.velocityX = this.speed;
+            this.facingRight = true;
+        } else {
+            this.velocityX *= game.friction;
+        }
+        
+        // 跳跃
+        if (keys.up && this.jumpCount < this.maxJumpCount) {
+            this.velocityY = this.jumpPower;
+            this.jumpCount++;
+            // 防止连续跳跃
+            keys.up = false;
+        }
+        
+
+        
+        // 技能：火球术 (X键)
+        if (keys.x && this.mana >= 10 && this.skillCooldowns.x <= 0) {
+            const projectile = new Projectile(
+                this.x + (this.facingRight ? this.width : 0),
+                this.y + this.height / 2,
+                this.facingRight ? 8 : -8,
+                0,
+                15, // 伤害
+                '#ff6600', // 颜色
+                8, // 大小
+                1000 // 最大生命周期
+            );
+            game.projectiles.push(projectile);
+            this.mana -= 10;
+            this.skillCooldowns.x = 30; // 3秒冷却
+            game.updateUI(); // 更新魔法值UI
+            keys.x = false;
+        }
+        
+        // 技能：冰锥术 (C键)
+        if (keys.c && this.mana >= 15 && this.skillCooldowns.c <= 0) {
+            const projectile = new Projectile(
+                this.x + (this.facingRight ? this.width : 0),
+                this.y + this.height / 2,
+                this.facingRight ? 6 : -6,
+                -4, // 向上的角度
+                20, // 伤害
+                '#87CEFA', // 颜色
+                8, // 大小
+                800 // 最大生命周期
+            );
+            game.projectiles.push(projectile);
+            this.mana -= 15;
+            this.skillCooldowns.c = 45; // 4.5秒冷却
+            game.updateUI(); // 更新魔法值UI
+            keys.c = false;
+        }
+        
+        // 暂停游戏
+        if (keys.space) {
+            game.pause();
+            keys.space = false;
+        }
+        
+        // 应用重力
+        this.velocityY += game.gravity;
+        
+        // 更新位置
+        this.x += this.velocityX;
+        this.y += this.velocityY;
+        
+        // 边界检查
+        if (this.x < 0) this.x = 0;
+        if (this.x + this.width > game.canvasWidth) this.x = game.canvasWidth - this.width;
+        
+        // 平台碰撞检测
+        let onGround = false;
+        for (let platform of platforms) {
+            // 从上方落到平台上
+            if (this.velocityY > 0 && // 向下移动
+                this.y + this.height <= platform.y + 10 && // 玩家底部接近平台顶部
+                this.y + this.height + this.velocityY >= platform.y && // 下一刻会碰撞
+                this.x + this.width > platform.x + 5 && // 水平方向有重叠
+                this.x < platform.x + platform.width - 5) {
+                
+                this.y = platform.y - this.height;
+                this.velocityY = 0;
+                this.isJumping = false;
+                this.jumpCount = 0;
+                onGround = true;
+            }
+        }
+        
+        // 限制下落
+        if (this.y + this.height > game.canvasHeight) {
+            this.y = game.canvasHeight - this.height;
+            this.velocityY = 0;
+            this.isJumping = false;
+            this.jumpCount = 0;
+            onGround = true;
+        }
+        
+        // 恢复魔法值
+        if (this.mana < this.maxMana) {
+            this.mana += 0.1;
+            if (this.mana > this.maxMana) this.mana = this.maxMana;
+        }
+        
+        // 更新技能冷却
+        for (let skill in this.skillCooldowns) {
+            if (this.skillCooldowns[skill] > 0) {
+                this.skillCooldowns[skill]--;
+            }
+        }
+        
+        // 更新动画
+        this.animationFrame += this.animationSpeed;
+        if (this.animationFrame >= 4) this.animationFrame = 0;
+    }
+    
+    render(ctx) {
+        // 像素风格玩家设计
+        
+        // 头部 - 浅色皮肤
+        ctx.fillStyle = '#FFDAB9';
+        ctx.fillRect(this.x + 8, this.y, 16, 16);
+        
+        // 头发 - 棕色
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(this.x + 8, this.y, 16, 6);
+        ctx.fillRect(this.x + 6, this.y + 2, 4, 6);
+        ctx.fillRect(this.x + 22, this.y + 2, 4, 6);
+        
+        // 眼睛 - 黑色
+        ctx.fillStyle = '#000000';
+        if (this.facingRight) {
+            ctx.fillRect(this.x + 13, this.y + 7, 3, 3);
+            ctx.fillRect(this.x + 20, this.y + 7, 3, 3);
+        } else {
+            ctx.fillRect(this.x + 13, this.y + 7, 3, 3);
+            ctx.fillRect(this.x + 10, this.y + 7, 3, 3);
+        }
+        
+        // 身体 - 蓝色上衣
+        ctx.fillStyle = '#4169E1';
+        ctx.fillRect(this.x + 4, this.y + 16, 24, 18);
+        
+        // 手臂 - 浅色皮肤
+        ctx.fillStyle = '#FFDAB9';
+        if (this.facingRight) {
+            ctx.fillRect(this.x + 24, this.y + 18, 8, 12);
+        } else {
+            ctx.fillRect(this.x - 4, this.y + 18, 8, 12);
+        }
+        
+        // 裤子 - 深蓝色
+        ctx.fillStyle = '#191970';
+        ctx.fillRect(this.x + 8, this.y + 34, 16, 10);
+        
+        // 腿部 - 浅色皮肤
+        ctx.fillStyle = '#FFDAB9';
+        ctx.fillRect(this.x + 10, this.y + 44, 6, 4);
+        ctx.fillRect(this.x + 16, this.y + 44, 6, 4);
+        
+        // 魔法杖 - 棕色杖身，金色顶端
+        ctx.fillStyle = '#8B4513';
+        if (this.facingRight) {
+            ctx.fillRect(this.x + 28, this.y + 22, 15, 3);
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(this.x + 43, this.y + 18, 8, 11);
+        } else {
+            ctx.fillRect(this.x - 15, this.y + 22, 15, 3);
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(this.x - 23, this.y + 18, 8, 11);
+        }
+    }
+}
+
+// 敌人类
+class Enemy {
+    constructor(x, y, level, type = 'mobile') {
+        this.x = x;
+        this.y = y;
+        this.width = 32;
+        this.height = 40;
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.speed = 1 * level; // 减慢移动速度，从2改为1
+        this.direction = 1; // 1 向右，-1 向左
+        this.level = level;
+        
+        // 敌人类型：'mobile'（移动型）或'static'（静止守护型）
+        this.type = type;
+        
+        // 属性
+        this.maxHealth = 30 * level;
+        this.health = this.maxHealth;
+        this.attackDamage = 5 * level;
+        
+        // 受伤状态
+        this.isHurt = false;
+        this.hurtTimer = 0;
+        
+        // 动画
+        this.animationFrame = 0;
+        this.animationSpeed = 0.1;
+        
+        // 静态敌人的攻击范围
+        this.attackRange = 150;
+        this.attackCooldown = 0;
+    }
+    
+    update(platforms, player, game) {
+        // 处理受伤状态
+        if (this.isHurt) {
+            this.hurtTimer--;
+            if (this.hurtTimer <= 0) {
+                this.isHurt = false;
+            }
+        }
+        
+        // 根据敌人类型执行不同行为
+        if (this.type === 'mobile') {
+            // 移动型敌人：随机巡逻
+            // 如果没有巡逻范围，设置初始巡逻范围
+            if (!this.patrolLeft) {
+                this.patrolLeft = this.x - 80;
+                this.patrolRight = this.x + 80;
+            }
+            
+            // 随机移动机制
+            // 随机时间间隔改变方向
+            if (!this.changeDirectionTimer) {
+                this.changeDirectionTimer = Math.floor(Math.random() * 60) + 30; // 30-90帧改变一次方向
+            }
+            this.changeDirectionTimer--;
+            
+            if (this.changeDirectionTimer <= 0) {
+                this.direction *= -1; // 改变方向
+                this.changeDirectionTimer = Math.floor(Math.random() * 60) + 30; // 重置计时器
+            }
+            
+            // 巡逻范围限制
+            if (this.x <= this.patrolLeft || this.x >= this.patrolRight) {
+                this.direction *= -1;
+            }
+            
+            this.velocityX = this.speed * this.direction;
+        } else if (this.type === 'static') {
+            // 静止型敌人：待在原地，攻击进入范围的玩家
+            this.velocityX = 0; // 不移动
+            
+            // 检查玩家是否在攻击范围内
+            const distanceToPlayer = Math.abs(this.x - player.x) + Math.abs(this.y - player.y);
+            if (distanceToPlayer < this.attackRange && this.attackCooldown <= 0) {
+                // 发射攻击（简单的红色球体）
+                const projectile = new Projectile(
+                    this.x + this.width / 2,
+                    this.y + this.height / 2,
+                    player.x > this.x ? 6 : -6, // 向玩家方向发射
+                    (player.y - this.y) * 0.05, // 简单的抛物线
+                    10, // 伤害
+                    '#ff0000', // 颜色
+                    8, // 大小
+                    500 // 最大生命周期
+                );
+                game.projectiles.push(projectile);
+                this.attackCooldown = 60; // 1秒冷却
+            }
+            
+            // 更新攻击冷却
+            if (this.attackCooldown > 0) {
+                this.attackCooldown--;
+            }
+        }
+        
+        // 检查边缘
+        let edgeDetected = false;
+        let onGround = false;
+        
+        for (let platform of platforms) {
+            // 检查是否在平台上
+            if (this.y + this.height <= platform.y && 
+                this.y + this.height + this.velocityY >= platform.y &&
+                this.x + this.width > platform.x &&
+                this.x < platform.x + platform.width) {
+                
+                this.y = platform.y - this.height;
+                this.velocityY = 0;
+                onGround = true;
+            }
+        }
+        
+        // 如果在地面上，检查前方是否有平台
+        if (onGround) {
+            const frontX = this.x + (this.direction > 0 ? this.width : -10);
+            const frontY = this.y + this.height + 1;
+            let hasPlatformInFront = false;
+            
+            for (let platform of platforms) {
+                if (frontX >= platform.x && frontX <= platform.x + platform.width &&
+                    frontY >= platform.y && frontY <= platform.y + platform.height) {
+                    hasPlatformInFront = true;
+                    break;
+                }
+            }
+            
+            if (!hasPlatformInFront) {
+                edgeDetected = true;
+            }
+        }
+        
+        // 如果检测到边缘，转向
+        if (edgeDetected) {
+            this.direction *= -1;
+        }
+        
+        // 应用重力（仅移动型敌人）
+        if (this.type === 'mobile') {
+            this.velocityY += 0.5;
+        } else {
+            this.velocityY = 0; // 静止型敌人不受重力影响
+        }
+        
+        // 更新位置
+        this.x += this.velocityX;
+        this.y += this.velocityY;
+        
+        // 限制下落
+        if (this.y + this.height > 400) {
+            this.y = 400 - this.height;
+            this.velocityY = 0;
+        }
+        
+        // 更新动画
+        this.animationFrame += this.animationSpeed;
+        if (this.animationFrame >= 4) this.animationFrame = 0;
+    }
+    
+    takeDamage(damage) {
+        this.health -= damage;
+        // 添加受伤效果
+        this.isHurt = true;
+        this.hurtTimer = 10; // 受伤动画持续时间
+    }
+    
+    render(ctx) {
+        // 受伤动画效果
+        if (this.isHurt) {
+            // 闪烁效果
+            if (Math.floor(this.hurtTimer / 2) % 2) {
+                ctx.fillStyle = '#ff8888'; // 受伤时淡红色
+            } else {
+                ctx.fillStyle = '#ff0000'; // 受伤时鲜红色
+            }
+            // 受伤时的发光效果
+            ctx.shadowColor = '#ff0000';
+            ctx.shadowBlur = 20;
+        } else {
+            // 正常状态 - 根据敌人类型显示不同颜色
+            if (this.type === 'mobile') {
+                ctx.fillStyle = '#8b0000'; // 移动型敌人：深暗红色
+                ctx.shadowColor = '#ff4444';
+                ctx.shadowBlur = 8;
+            } else {
+                ctx.fillStyle = '#4b0082'; // 静止型敌人：紫色
+                ctx.shadowColor = '#ff00ff';
+                ctx.shadowBlur = 12;
+            }
+        }
+        
+        // 绘制敌人主体 - 邪恶的形状
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.width/2, this.y); // 顶部尖峰
+        ctx.lineTo(this.x + this.width, this.y + 15); // 右肩
+        ctx.lineTo(this.x + this.width, this.y + this.height - 10); // 右侧
+        ctx.lineTo(this.x + this.width/2, this.y + this.height); // 底部中间
+        ctx.lineTo(this.x, this.y + this.height - 10); // 左侧
+        ctx.lineTo(this.x, this.y + 15); // 左肩
+        ctx.closePath();
+        ctx.fill();
+        
+        // 绘制敌人轮廓
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // 绘制邪恶的眼睛 - 红色发光
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath();
+        ctx.arc(this.x + 10, this.y + 15, 6, 0, Math.PI * 2);
+        ctx.arc(this.x + 22, this.y + 15, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 绘制眼睛瞳孔 - 黑色小点
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(this.x + 12, this.y + 15, 2, 0, Math.PI * 2);
+        ctx.arc(this.x + 24, this.y + 15, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 绘制邪恶的笑容 - 锯齿状
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(this.x + 8, this.y + 28);
+        ctx.lineTo(this.x + 12, this.y + 32);
+        ctx.lineTo(this.x + 16, this.y + 28);
+        ctx.lineTo(this.x + 20, this.y + 32);
+        ctx.lineTo(this.x + 24, this.y + 28);
+        ctx.stroke();
+        
+        // 绘制邪恶的角
+        ctx.fillStyle = '#8b0000';
+        ctx.beginPath();
+        // 左角
+        ctx.moveTo(this.x + 8, this.y + 5);
+        ctx.lineTo(this.x + 4, this.y - 5);
+        ctx.lineTo(this.x + 8, this.y - 2);
+        ctx.closePath();
+        // 右角
+        ctx.moveTo(this.x + 24, this.y + 5);
+        ctx.lineTo(this.x + 28, this.y - 5);
+        ctx.lineTo(this.x + 24, this.y - 2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 绘制角的轮廓
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // 绘制生命值条
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(this.x, this.y - 10, this.width, 5);
+        ctx.fillStyle = this.health > this.maxHealth / 2 ? '#00ff00' : '#ff0000';
+        ctx.fillRect(this.x, this.y - 10, (this.health / this.maxHealth) * this.width, 5);
+        
+        // 绘制警示光效
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2 + 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 静止型敌人添加邪恶光环
+        if (this.type === 'static') {
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([6, 3]);
+            ctx.beginPath();
+            ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width + 15, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // 重置阴影效果
+        ctx.shadowBlur = 0;
+    }
+}
+
+// 平台类
+class Platform {
+    constructor(x, y, width, height, type = 'normal') {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.type = type; // normal 或 ice
+        
+        // 冰块相关属性
+        if (type === 'ice') {
+            this.collisionCount = 0;
+            this.maxCollisions = 30; // 玩家站在上面的帧数，超过就碎掉
+            this.isBroken = false;
+        }
+    }
+    
+    render(ctx) {
+        if (this.type === 'ice') {
+            if (this.isBroken) {
+                return; // 碎掉的冰块不渲染
+            }
+            // 绘制冰块平台（增加发光效果，确保可见）
+            ctx.shadowColor = '#FFFFFF';
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            ctx.shadowBlur = 0;
+            
+            // 绘制冰块边框
+            ctx.strokeStyle = '#00BFFF';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+            
+            // 绘制明显的裂纹纹理
+            ctx.strokeStyle = '#1E90FF';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y + this.height/2);
+            ctx.lineTo(this.x + this.width, this.y + this.height/2);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(this.x + this.width/2, this.y);
+            ctx.lineTo(this.x + this.width/2, this.y + this.height);
+            ctx.stroke();
+        } else {
+            // 普通平台
+            ctx.fillStyle = '#8b4513';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            // 绘制平台纹理
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < this.width; i += 20) {
+                ctx.beginPath();
+                ctx.moveTo(this.x + i, this.y);
+                ctx.lineTo(this.x + i, this.y + this.height);
+                ctx.stroke();
+            }
+        }
+    }
+    
+    // 检查并更新冰块状态（只有当玩家站在上面时才计数）
+    update(player) {
+        if (this.type === 'ice' && !this.isBroken) {
+            // 检查玩家是否站在冰块上
+            const isPlayerOnIce = player.y + player.height >= this.y &&
+                                player.y < this.y + this.height &&
+                                player.x + player.width > this.x &&
+                                player.x < this.x + this.width;
+            
+            if (isPlayerOnIce) {
+                this.collisionCount++;
+                if (this.collisionCount >= this.maxCollisions) {
+                    this.isBroken = true;
+                    // 当冰块碎裂时，将玩家向下移动并添加下落速度
+                    player.y = this.y + this.height;
+                    player.velocityY = 2; // 给玩家一个初始下落速度
+                }
+            }
+        }
+    }
+}
+
+// 地刺类
+class Spike {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 20;
+        this.height = 20;
+        this.damage = 20; // 伤害值
+    }
+    
+    render(ctx) {
+        // 绘制地刺（添加发光效果，确保在洞穴中可见）
+        ctx.shadowColor = '#FF0000';
+        ctx.shadowBlur = 10;
+        
+        // 绘制地刺底座
+        ctx.fillStyle = '#333333';
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.width / 2, this.y);
+        ctx.lineTo(this.x, this.y + this.height);
+        ctx.lineTo(this.x + this.width / 2, this.y + this.height * 0.5);
+        ctx.lineTo(this.x + this.width, this.y + this.height);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 绘制地刺尖刺（亮红色）
+        ctx.fillStyle = '#FF0000';
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.width / 2, this.y);
+        ctx.lineTo(this.x + this.width * 0.3, this.y + this.height * 0.3);
+        ctx.lineTo(this.x + this.width * 0.5, this.y + this.height * 0.1);
+        ctx.lineTo(this.x + this.width * 0.7, this.y + this.height * 0.3);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 重置阴影
+        ctx.shadowBlur = 0;
+        
+        // 绘制地刺边框
+        ctx.strokeStyle = '#FFFF00';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.width / 2, this.y);
+        ctx.lineTo(this.x, this.y + this.height);
+        ctx.lineTo(this.x + this.width / 2, this.y + this.height * 0.5);
+        ctx.lineTo(this.x + this.width, this.y + this.height);
+        ctx.closePath();
+        ctx.stroke();
+    }
+}
+
+// 投射物类
+class Projectile {
+    constructor(x, y, velocityX, velocityY, damage, color, size, maxLife) {
+        this.x = x;
+        this.y = y;
+        this.velocityX = velocityX;
+        this.velocityY = velocityY;
+        this.damage = damage;
+        this.color = color;
+        this.size = size;
+        this.maxLife = maxLife;
+        this.life = maxLife;
+        
+        // 动画
+        this.animationFrame = 0;
+    }
+    
+    update() {
+        this.x += this.velocityX;
+        this.y += this.velocityY;
+        this.life--;
+        
+        // 应用重力
+        this.velocityY += 0.1;
+        
+        // 更新动画
+        this.animationFrame += 0.2;
+    }
+    
+    render(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size + Math.sin(this.animationFrame) * 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 添加发光效果
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+// 魔法水晶类
+class Crystal {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 20;
+        this.height = 20;
+        this.animationFrame = 0;
+        this.colors = ['#ff00ff', '#00ffff', '#ffff00', '#ff0000', '#00ff00'];
+        this.currentColorIndex = 0;
+    }
+    
+    render(ctx) {
+        // 动画效果
+        this.animationFrame += 0.1;
+        if (this.animationFrame >= 1) {
+            this.animationFrame = 0;
+            this.currentColorIndex = (this.currentColorIndex + 1) % this.colors.length;
+        }
+        
+        // 绘制水晶（简单的像素风格）
+        ctx.fillStyle = this.colors[this.currentColorIndex];
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.width / 2, this.y);
+        ctx.lineTo(this.x + this.width, this.y + this.height / 3);
+        ctx.lineTo(this.x + this.width, this.y + this.height * 2 / 3);
+        ctx.lineTo(this.x + this.width / 2, this.y + this.height);
+        ctx.lineTo(this.x, this.y + this.height * 2 / 3);
+        ctx.lineTo(this.x, this.y + this.height / 3);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 添加发光效果
+        ctx.shadowColor = this.colors[this.currentColorIndex];
+        ctx.shadowBlur = 15;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+// 游戏初始化
+document.addEventListener('DOMContentLoaded', () => {
+    new Game();
+});

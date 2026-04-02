@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>魔法森林大冒险</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- 游戏标题 -->
+        <header class="game-header">
+            <h1>魔法森林大冒险</h1>
+        </header>
+        
+        <!-- 游戏主界面 -->
+        <main class="game-main">
+            <!-- 游戏画布 -->
+            <div class="canvas-container">
+                <canvas id="gameCanvas" width="800" height="400"></canvas>
+            </div>
+            
+            <!-- 游戏信息面板 -->
+        <div class="game-info">
+            <div class="player-stats">
+                <div class="stat-item">
+                    <span class="stat-label">生命值:</span>
+                    <div class="health-bar">
+                        <div id="healthFill" class="health-fill"></div>
+                        <span id="healthText" class="health-text">100/100</span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">魔法值:</span>
+                    <div class="mana-bar">
+                        <div id="manaFill" class="mana-fill"></div>
+                        <span id="manaText" class="mana-text">100/100</span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">水晶:</span>
+                    <span id="crystalsCount" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">关卡:</span>
+                    <span id="levelNumber" class="stat-value">1</span>
+                </div>
+            </div>
+        </div>
+        </main>
+        
+        <!-- 游戏结束界面 -->
+        <div id="gameOverScreen" class="game-over-screen" style="display: none;">
+            <div class="game-over-content">
+                <h2 id="gameOverTitle">游戏结束</h2>
+                <p id="gameOverMessage">你被击败了！</p>
+                <button id="restartBtn" class="restart-btn">重新开始</button>
+            </div>
+        </div>
+        
+        <!-- 新手引导界面 -->
+        <div id="introScreen" class="intro-screen">
+            <div class="intro-content">
+                <h2>欢迎来到魔法森林大冒险！</h2>
+                <div class="intro-text">
+                    <h3>游戏目标</h3>
+                    <p>探索5个不同主题的关卡，收集每个关卡中的所有魔法水晶，击败所有敌人，最终到达终点。</p>
+                    
+                    <h3>操作说明</h3>
+                    <div class="control-grid">
+                        <div class="control-item">
+                            <span class="key">← →</span>
+                            <span>方向键：左右移动</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="key">↑</span>
+                            <span>方向键：跳跃（支持二段跳）</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="key">X</span>
+                            <span>火球术（远程攻击，消耗10点魔法值）</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="key">C</span>
+                            <span>冰锥术（带角度攻击，消耗15点魔法值）</span>
+                        </div>
+
+                        <div class="control-item">
+                            <span class="key">空格</span>
+                            <span>暂停游戏</span>
+                        </div>
+                    </div>
+                    
+                    <h3>游戏特色</h3>
+                    <ul>
+                        <li>5个独特主题的关卡：森林、洞穴、湖泊、遗迹、城堡</li>
+                        <li>两种敌人类型：移动巡逻型和静止守护型</li>
+                        <li>特殊平台：会碎裂的冰块跳板</li>
+                        <li>危险陷阱：尖刺地刺</li>
+                        <li>魔法技能：火球术和冰锥术</li>
+                        <li>等级提升系统：收集水晶提升等级和能力</li>
+                    </ul>
+                    
+                    <h3>游戏提示</h3>
+                    <ul>
+                        <li>魔法值会随着时间自动恢复</li>
+                        <li>静止型敌人会发射远程攻击，注意躲避</li>
+                        <li>冰块跳板站立一段时间后会碎裂，记得及时离开</li>
+                        <li>地刺会造成大量伤害，务必小心</li>
+                        <li>收集所有水晶才能开启关卡终点的门</li>
+                    </ul>
+                </div>
+                <button id="startBtn" class="start-btn">开始游戏</button>
+            </div>
+        </div>
+        
+        <!-- 暂停界面 -->
+        <div id="pauseScreen" class="pause-screen" style="display: none;">
+            <div class="pause-content">
+                <h2>游戏暂停</h2>
+                <button id="resumeBtn" class="resume-btn">继续游戏</button>
+                <button id="restartGameBtn" class="restart-game-btn">重新开始</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+    <script>
+        // 页面加载完成后创建游戏实例
+        window.addEventListener('load', () => {
+            const game = new Game();
+        });
+    </script>
+</body>
+</html>
